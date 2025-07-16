@@ -1,14 +1,28 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// middleware/firebaseAuth.js
+const admin = require('firebase-admin');
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAFoyi_t8ZexvM6VtKd-XRozE6Fp_dipY4",
-  authDomain: "https://accounts.google.com/o/oauth2/auth",
-  projectId: "peaknet-8910d",
-  storageBucket: "your-app.appspot.com",
-  messagingSenderId: "peaknet2025@gmail.com",
-  appId: "peaknet-8910d"
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Very important
+    }),
+  });
+}
+
+const verifyFirebaseToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split('Bearer ')[1];
+  if (!token) return res.status(401).json({ message: 'Missing token' });
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('❌ Token verification failed:', error);
+    return res.status(401).json({ message: 'Invalid token' });
+  }
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+module.exports = verifyFirebaseToken;
